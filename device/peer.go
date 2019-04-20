@@ -186,7 +186,7 @@ func (peer *Peer) String() string {
 	if len(base64Key) == 44 {
 		abbreviatedKey = base64Key[0:4] + "…" + base64Key[39:43]
 	}
-	return fmt.Sprintf("peer(%s)", abbreviatedKey)
+	return fmt.Sprintf("[%s]", abbreviatedKey)
 }
 
 func (peer *Peer) Start() {

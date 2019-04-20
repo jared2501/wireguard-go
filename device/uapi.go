@@ -105,10 +105,14 @@ func (device *Device) IpcGetOperation(socket *bufio.Writer) *IPCError {
 	return nil
 }
 
+type Silence struct {}
+func (s Silence) Printf(fmt string, args... interface{}) {}
+func (s Silence) Println(args... interface{}) {}
+
 func (device *Device) IpcSetOperation(socket *bufio.Reader) error {
 	scanner := bufio.NewScanner(socket)
 	logError := device.log.Error
-	logDebug := device.log.Debug
+	logDebug := Silence{}
 
 	var peer *Peer
 

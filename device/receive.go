@@ -95,7 +95,7 @@ func (peer *Peer) keepKeyFreshReceiving() {
  */
 func (device *Device) RoutineReceiveIncoming(IP int, bind conn.Bind) {
 
-	logDebug := device.log.Debug
+	logDebug := Silence{}
 	defer func() {
 		logDebug.Println("Routine: receive incoming IPv" + strconv.Itoa(IP) + " - stopped")
 		device.net.stopping.Done()
@@ -206,7 +206,7 @@ func (device *Device) RoutineReceiveIncoming(IP int, bind conn.Bind) {
 			okay = len(packet) == MessageCookieReplySize
 
 		default:
-			logDebug.Println("Received message with unknown type")
+			logDebug.Printf("Received message with unknown type from %v", endpoint.DstIP())
 		}
 
 		if okay {
@@ -231,7 +231,7 @@ func (device *Device) RoutineDecryption() {
 
 	var nonce [chacha20poly1305.NonceSize]byte
 
-	logDebug := device.log.Debug
+	logDebug := Silence{}
 	defer func() {
 		logDebug.Println("Routine: decryption worker - stopped")
 		device.state.stopping.Done()
@@ -313,14 +313,14 @@ func (device *Device) RoutineHandshake() {
 	var ok bool
 
 	defer func() {
-		logDebug.Println("Routine: handshake worker - stopped")
+		//logDebug.Println("Routine: handshake worker - stopped")
 		device.state.stopping.Done()
 		if elem.buffer != nil {
 			device.PutMessageBuffer(elem.buffer)
 		}
 	}()
 
-	logDebug.Println("Routine: handshake worker - started")
+	//logDebug.Println("Routine: handshake worker - started")
 	device.state.starting.Done()
 
 	for {
@@ -379,7 +379,7 @@ func (device *Device) RoutineHandshake() {
 			// check mac fields and maybe ratelimit
 
 			if !device.cookieChecker.CheckMAC1(elem.packet) {
-				logDebug.Println("Received packet with invalid mac1")
+				logDebug.Printf("Received packet with invalid mac1 from %v\n", elem.endpoint.DstIP())
 				continue
 			}
 
@@ -509,7 +509,7 @@ func (peer *Peer) RoutineSequentialReceiver() {
 	var elem *QueueInboundElement
 
 	defer func() {
-		logDebug.Println(peer, "- Routine: sequential receiver - stopped")
+		//logDebug.Println(peer, "- Routine: sequential receiver - stopped")
 		peer.routines.stopping.Done()
 		if elem != nil {
 			if !elem.IsDropped() {
@@ -519,7 +519,7 @@ func (peer *Peer) RoutineSequentialReceiver() {
 		}
 	}()
 
-	logDebug.Println(peer, "- Routine: sequential receiver - started")
+	//logDebug.Println(peer, "- Routine: sequential receiver - started")
 
 	peer.routines.starting.Done()
 

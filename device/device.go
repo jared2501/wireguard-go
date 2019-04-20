@@ -6,6 +6,8 @@
 package device
 
 import (
+	"encoding/base64"
+	"fmt"
 	"runtime"
 	"sync"
 	"sync/atomic"
@@ -186,6 +188,17 @@ func deviceUpdateState(device *Device) {
 	// check for state change in the mean time
 
 	deviceUpdateState(device)
+}
+
+func (device *Device) String() string {
+	device.staticIdentity.RLock()
+	defer device.staticIdentity.RUnlock()
+	base64Key := base64.StdEncoding.EncodeToString(device.staticIdentity.publicKey[:])
+	abbreviatedKey := "invalid"
+	if len(base64Key) == 44 {
+		abbreviatedKey = base64Key[0:4] + "…" + base64Key[39:43]
+	}
+	return fmt.Sprintf("[%s]", abbreviatedKey)
 }
 
 func (device *Device) Up() {
