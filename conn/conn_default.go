@@ -8,9 +8,13 @@
 package conn
 
 import (
+	"context"
+	"fmt"
 	"net"
 	"os"
 	"syscall"
+
+	"github.com/libp2p/go-reuseport"
 )
 
 /* This code is meant to be a temporary solution
@@ -69,11 +73,16 @@ func (e *NativeEndpoint) SrcToString() string {
 func listenNet(network string, port int) (*net.UDPConn, int, error) {
 
 	// listen
+	ctx := context.Background()
+	lc := net.ListenConfig{
+		Control: reuseport.Control, // sets SO_REUSEADDR and SO_REUSEPORT
+	}
 
-	conn, err := net.ListenUDP(network, &net.UDPAddr{Port: port})
+	packetConn, err := lc.ListenPacket(ctx, network, fmt.Sprintf(":%d", port))
 	if err != nil {
 		return nil, 0, err
 	}
+	conn := packetConn.(*net.UDPConn)
 
 	// retrieve port
 
