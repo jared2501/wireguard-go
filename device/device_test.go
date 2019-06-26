@@ -41,7 +41,9 @@ endpoint=127.0.0.1:53511`
 
 func TestTwoDevicePing(t *testing.T) {
 	tun1 := NewChannelTUN()
-	dev1 := NewDevice(tun1.TUN(), NewLogger(LogLevelDebug, "dev1: "))
+	dev1 := NewDevice(tun1.TUN(), &DeviceOptions{
+		Logger: NewLogger(LogLevelDebug, "dev1: "),
+	})
 	dev1.Up()
 	defer dev1.Close()
 	if err := dev1.IpcSetOperation(bufio.NewReader(strings.NewReader(cfg1))); err != nil {
@@ -49,7 +51,9 @@ func TestTwoDevicePing(t *testing.T) {
 	}
 
 	tun2 := NewChannelTUN()
-	dev2 := NewDevice(tun2.TUN(), NewLogger(LogLevelDebug, "dev2: "))
+	dev2 := NewDevice(tun2.TUN(), &DeviceOptions{
+		Logger: NewLogger(LogLevelDebug, "dev2: "),
+	})
 	dev2.Up()
 	defer dev2.Close()
 	if err := dev2.IpcSetOperation(bufio.NewReader(strings.NewReader(cfg2))); err != nil {
@@ -91,7 +95,9 @@ func TestSimultaneousHandshake(t *testing.T) {
 	const maxWait = 6 * time.Second
 
 	tun1 := NewChannelTUN()
-	dev1 := NewDevice(tun1.TUN(), NewLogger(LogLevelDebug, "dev1: "))
+	dev1 := NewDevice(tun1.TUN(), &DeviceOptions{
+		Logger: NewLogger(LogLevelDebug, "dev1: "),
+	})
 	dev1.Up()
 	defer dev1.Close()
 	if err := dev1.IpcSetOperation(bufio.NewReader(strings.NewReader(cfg1))); err != nil {
@@ -99,7 +105,9 @@ func TestSimultaneousHandshake(t *testing.T) {
 	}
 
 	tun2 := NewChannelTUN()
-	dev2 := NewDevice(tun2.TUN(), NewLogger(LogLevelDebug, "dev2: "))
+	dev2 := NewDevice(tun2.TUN(), &DeviceOptions{
+		Logger: NewLogger(LogLevelDebug, "dev2: "),
+	})
 	dev2.Up()
 	defer dev2.Close()
 	if err := dev2.IpcSetOperation(bufio.NewReader(strings.NewReader(cfg2))); err != nil {
@@ -292,7 +300,9 @@ func randDevice(t *testing.T) *Device {
 	}
 	tun := newDummyTUN("dummy")
 	logger := NewLogger(LogLevelError, "")
-	device := NewDevice(tun, logger)
+	device := NewDevice(tun, &DeviceOptions{
+		Logger: logger,
+	})
 	device.SetPrivateKey(sk)
 	return device
 }
