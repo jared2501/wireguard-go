@@ -203,7 +203,10 @@ func (peer *Peer) Start() {
 	peer.queue.inbound = make(chan *QueueInboundElement, QueueInboundSize)
 
 	peer.timersInit()
-	peer.handshake.lastSentHandshake = time.Now().Add(-(RekeyTimeout + time.Second))
+	// TODO(apenwarr): This doesn't seem necessary.
+	//   It just means the first handshake sometimes doesn't go out,
+	//   delaying initial connection by sometimes several seconds.
+	//peer.handshake.lastSentHandshake = time.Now().Add(-(RekeyTimeout + time.Second))
 	peer.signals.newKeypairArrived = make(chan struct{}, 1)
 	peer.signals.flushNonceQueue = make(chan struct{}, 1)
 
