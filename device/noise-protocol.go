@@ -13,6 +13,7 @@ import (
 	"golang.org/x/crypto/blake2s"
 	"golang.org/x/crypto/chacha20poly1305"
 	"golang.org/x/crypto/poly1305"
+	"golang.zx2c4.com/wireguard/device/tokenbucket"
 	"golang.zx2c4.com/wireguard/tai64n"
 )
 
@@ -95,20 +96,20 @@ type MessageCookieReply struct {
 }
 
 type Handshake struct {
-	state                     int
-	mutex                     sync.RWMutex
-	hash                      [blake2s.Size]byte       // hash value
-	chainKey                  [blake2s.Size]byte       // chain key
-	presharedKey              NoiseSymmetricKey        // psk
-	localEphemeral            NoisePrivateKey          // ephemeral secret key
-	localIndex                uint32                   // used to clear hash-table
-	remoteIndex               uint32                   // index for sending
-	remoteStatic              NoisePublicKey           // long term key
-	remoteEphemeral           NoisePublicKey           // ephemeral public key
-	precomputedStaticStatic   [NoisePublicKeySize]byte // precomputed shared secret
-	lastTimestamp             tai64n.Timestamp
-	lastInitiationConsumption time.Time
-	lastSentHandshake         time.Time
+	state                   int
+	mutex                   sync.RWMutex
+	hash                    [blake2s.Size]byte       // hash value
+	chainKey                [blake2s.Size]byte       // chain key
+	presharedKey            NoiseSymmetricKey        // psk
+	localEphemeral          NoisePrivateKey          // ephemeral secret key
+	localIndex              uint32                   // used to clear hash-table
+	remoteIndex             uint32                   // index for sending
+	remoteStatic            NoisePublicKey           // long term key
+	remoteEphemeral         NoisePublicKey           // ephemeral public key
+	precomputedStaticStatic [NoisePublicKeySize]byte // precomputed shared secret
+	lastTimestamp           tai64n.Timestamp
+	initiationLimit         tokenbucket.TokenBucket
+	lastSentHandshake       time.Time
 }
 
 var (
@@ -300,7 +301,8 @@ func (device *Device) ConsumeMessageInitiation(msg *MessageInitiation) *Peer {
 	// protect against replay & flood
 
 	replay := !timestamp.After(handshake.lastTimestamp)
-	flood := time.Since(handshake.lastInitiationConsumption) <= HandshakeInitationRate
+	now := time.Now()
+	flood := !handshake.initiationLimit.CanTake(now)
 	handshake.mutex.RUnlock()
 	if replay {
 		device.log.Debug.Printf("%v - ConsumeMessageInitiation: handshake replay @ %v\n", peer, timestamp)
@@ -322,10 +324,8 @@ func (device *Device) ConsumeMessageInitiation(msg *MessageInitiation) *Peer {
 	if timestamp.After(handshake.lastTimestamp) {
 		handshake.lastTimestamp = timestamp
 	}
-	now := time.Now()
-	if now.After(handshake.lastInitiationConsumption) {
-		handshake.lastInitiationConsumption = now
-	}
+	handshake.lastTimestamp = timestamp
+	handshake.initiationLimit.Take(now)
 	handshake.state = HandshakeInitiationConsumed
 
 	handshake.mutex.Unlock()

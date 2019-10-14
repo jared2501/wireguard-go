@@ -112,6 +112,8 @@ func (device *Device) NewPeer(pk NoisePublicKey) (*Peer, error) {
 	handshake.precomputedStaticStatic = device.staticIdentity.privateKey.sharedSecret(pk)
 	ssIsZero := isZero(handshake.precomputedStaticStatic[:])
 	handshake.remoteStatic = pk
+	handshake.initiationLimit.Cap = 10
+	handshake.initiationLimit.Fill = HandshakeInitationRate
 	handshake.mutex.Unlock()
 
 	// reset endpoint
