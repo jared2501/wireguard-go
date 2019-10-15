@@ -29,6 +29,7 @@ type Device struct {
 	isUp           AtomicBool // device is (going) up
 	isClosed       AtomicBool // device is closed? (acting as guard)
 	log            *Logger
+	handshakeDone  func()
 	skipBindUpdate bool
 	createBind     func(uport uint16, device *Device) (conn.Bind, uint16, error)
 	createEndpoint func(key [32]byte, s string) (conn.Endpoint, error)
@@ -275,6 +276,9 @@ type DeviceOptions struct {
 	// The packet is then dropped.
 	UnexpectedIP func(key *wgcfg.Key, ip wgcfg.IP)
 
+	// HandshakeDone is called every time we complete a peer handshake.
+	HandshakeDone func()
+
 	CreateEndpoint func(key [32]byte, s string) (conn.Endpoint, error)
 	CreateBind     func(uport uint16) (conn.Bind, uint16, error)
 	SkipBindUpdate bool // if true, CreateBind only ever called once
@@ -297,6 +301,7 @@ func NewDevice(tunDevice tun.Device, opts *DeviceOptions) *Device {
 				device.log.Info.Printf("IPv4 packet with disallowed source address %s from %v", ip, key)
 			}
 		}
+		device.handshakeDone = opts.HandshakeDone
 		if opts.CreateEndpoint != nil {
 			device.createEndpoint = opts.CreateEndpoint
 		} else {

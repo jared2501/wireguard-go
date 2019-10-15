@@ -409,6 +409,10 @@ func (peer *Peer) RoutineNonce() {
 				select {
 				case <-peer.signals.newKeypairArrived:
 					logDebug.Println(peer, "- Obtained awaited keypair")
+					hd := device.handshakeDone
+					if hd != nil {
+						hd()
+					}
 
 				case <-peer.signals.flushNonceQueue:
 					device.PutMessageBuffer(elem.buffer)
