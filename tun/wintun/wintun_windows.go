@@ -153,7 +153,7 @@ func (pool Pool) GetInterface(ifname string) (*Interface, error) {
 		ifname2 = strings.ToLower(ifname2)
 		ifname3 := removeNumberedSuffix(ifname2)
 
-		if ifname == ifname2 || ifname == ifname3 {
+		if true || ifname == ifname2 || ifname == ifname3 {
 			err = devInfo.BuildDriverInfoList(devInfoData, setupapi.SPDIT_COMPATDRIVER)
 			if err != nil {
 				return nil, fmt.Errorf("SetupDiBuildDriverInfoList failed: %v", err)
