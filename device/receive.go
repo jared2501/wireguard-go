@@ -591,10 +591,7 @@ func (peer *Peer) RoutineSequentialReceiver() {
 
 			src := elem.packet[IPv4offsetSrc : IPv4offsetSrc+net.IPv4len]
 			if device.allowedips.LookupIPv4(src) != peer {
-				logInfo.Println(
-					"IPv4 packet with disallowed source address from",
-					peer,
-				)
+				logInfo.Printf("IPv4 packet with disallowed source address %s from %v", net.IP(src), peer)
 				continue
 			}
 
@@ -634,6 +631,8 @@ func (peer *Peer) RoutineSequentialReceiver() {
 		// write to tun device
 
 		offset := MessageTransportOffsetContent
+		atomic.AddUint64(&peer.stats.rxBytes, uint64(len(elem.packet)))
+		atomic.StoreInt64(&peer.stats.lastRXNano, time.Now().UnixNano())
 		_, err := device.tun.device.Write(elem.buffer[:offset+len(elem.packet)], offset)
 		if len(peer.queue.inbound) == 0 {
 			err = device.tun.device.Flush()

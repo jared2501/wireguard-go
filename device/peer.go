@@ -29,10 +29,12 @@ type Peer struct {
 	endpoint                    conn.Endpoint
 	persistentKeepaliveInterval uint16
 
+	// All fields must be accessed via atomic load and store.
 	// This must be 64-bit aligned, so make sure the above members come out to even alignment and pad accordingly
 	stats struct {
 		txBytes           uint64 // bytes send to peer (endpoint)
 		rxBytes           uint64 // bytes received from peer
+		lastRXNano        int64  // time.Now().UnixNano() of last rxBytes increment
 		lastHandshakeNano int64  // nano seconds since epoch
 	}
 
@@ -135,6 +137,25 @@ func (device *Device) NewPeer(pk NoisePublicKey) (*Peer, error) {
 	}
 
 	return peer, nil
+}
+
+// PeerStats is statistics about the connection to the Peer.
+type PeerStats struct {
+	TX     uint64    // bytes sent to peer
+	RX     uint64    // bytes received from peer
+	LastRX time.Time // time of last bytes received
+}
+
+func (peer *Peer) Stats() PeerStats {
+	lastRXNano := atomic.LoadInt64(&peer.stats.lastRXNano)
+	stats := PeerStats{
+		TX: atomic.LoadUint64(&peer.stats.txBytes),
+		RX: atomic.LoadUint64(&peer.stats.rxBytes),
+	}
+	if lastRXNano != 0 {
+		stats.LastRX = time.Unix(0, lastRXNano)
+	}
+	return stats
 }
 
 func (peer *Peer) SendBuffer(buffer []byte) error {
