@@ -443,7 +443,11 @@ func (device *Device) RoutineHandshake() {
 			logDebug.Println(peer, "- Received handshake initiation")
 			atomic.AddUint64(&peer.stats.rxBytes, uint64(len(elem.packet)))
 
-			peer.SendHandshakeResponse()
+			if peer.handshake.state == HandshakeInitiationConsumed {
+				peer.SendHandshakeResponse()
+			} else {
+				logDebug.Printf("%v - SKIPPING response.\n", peer)
+			}
 
 		case MessageResponseType:
 

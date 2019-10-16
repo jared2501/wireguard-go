@@ -76,6 +76,17 @@ func setZero(arr []byte) {
 	}
 }
 
+func (a *NoisePublicKey) LessThan(b *NoisePublicKey) bool {
+	for i := range a {
+		if a[i] < b[i] {
+			return true
+		} else if a[i] > b[i] {
+			return false
+		}
+	}
+	return false
+}
+
 func (sk *NoisePrivateKey) clamp() {
 	sk[0] &= 248
 	sk[31] = (sk[31] & 127) | 64
