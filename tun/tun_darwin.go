@@ -195,13 +195,13 @@ func CreateTUNFromFile(file *os.File, mtu int) (Device, error) {
 	name, err := tun.Name()
 	if err != nil {
 		tun.tunFile.Close()
-		return nil, err
+		return nil, fmt.Errorf("tun.Name: %v", err)
 	}
 
 	tunIfindex, err := func() (int, error) {
 		iface, err := net.InterfaceByName(name)
 		if err != nil {
-			return -1, err
+			return -1, fmt.Errorf("net.InterfaceByName(%q): %v", name, err)
 		}
 		return iface.Index, nil
 	}()
@@ -213,7 +213,7 @@ func CreateTUNFromFile(file *os.File, mtu int) (Device, error) {
 	tun.routeSocket, err = unix.Socket(unix.AF_ROUTE, unix.SOCK_RAW, unix.AF_UNSPEC)
 	if err != nil {
 		tun.tunFile.Close()
-		return nil, err
+		return nil, fmt.Errorf("unix.Socket: %v", err)
 	}
 
 	go tun.routineRouteListener(tunIfindex)
