@@ -31,7 +31,7 @@ func initializeNamespace() error {
 	if hasInitializedNamespace {
 		return nil
 	}
-	sd, err := windows.SecurityDescriptorFromString("O:SYD:P(A;;GA;;;SY)")
+	sd, err := windows.SecurityDescriptorFromString("O:BAD:P(A;;GA;;;SY)(A;;GA;;;BA)")
 	if err != nil {
 		return fmt.Errorf("SddlToSecurityDescriptor failed: %v", err)
 	}
@@ -39,9 +39,9 @@ func initializeNamespace() error {
 		Length:             uint32(unsafe.Sizeof(windows.SecurityAttributes{})),
 		SecurityDescriptor: sd,
 	}
-	sid, err := windows.CreateWellKnownSid(windows.WinLocalSystemSid)
+	sid, err := windows.CreateWellKnownSid(windows.WinBuiltinAdministratorsSid)
 	if err != nil {
-		return fmt.Errorf("CreateWellKnownSid(LOCAL_SYSTEM) failed: %v", err)
+		return fmt.Errorf("CreateWellKnownSid(BUILTIN_ADMINS) failed: %v", err)
 	}
 
 	boundary, err := namespaceapi.CreateBoundaryDescriptor("Wintun")
