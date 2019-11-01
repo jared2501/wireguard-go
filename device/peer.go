@@ -324,6 +324,10 @@ func (peer *Peer) SetEndpointAddress(addr *net.UDPAddr) {
 	if RoamingDisabled {
 		return
 	}
+	if p := peer.device.allowedips.LookupIP(addr.IP); p != nil {
+		peer.device.log.Debug.Printf("%v - SetEndPointAddress: %v owned by %v, skipping", peer, addr, p)
+		return
+	}
 	peer.Lock()
 	err := peer.endpoint.UpdateDst(addr)
 	peer.Unlock()
