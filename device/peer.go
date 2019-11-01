@@ -328,10 +328,13 @@ func (peer *Peer) SetEndpointAddress(addr *net.UDPAddr) {
 		peer.device.log.Debug.Printf("%v - SetEndPointAddress: %v owned by %v, skipping", peer, addr, p)
 		return
 	}
+
 	peer.Lock()
-	err := peer.endpoint.UpdateDst(addr)
-	peer.Unlock()
-	if err != nil {
-		peer.device.log.Debug.Printf("%v - SetEndpointAddress: %v", peer, err)
+	if peer.endpoint != nil {
+		err := peer.endpoint.UpdateDst(addr)
+		if err != nil {
+			peer.device.log.Debug.Printf("%v - SetEndpointAddress: %v", peer, err)
+		}
 	}
+	peer.Unlock()
 }
