@@ -1,4 +1,4 @@
-package device
+package conn
 
 import (
 	"syscall"

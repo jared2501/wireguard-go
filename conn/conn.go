@@ -20,8 +20,8 @@ const (
 type Bind interface {
 	LastMark() uint32
 	SetMark(value uint32) error
-	ReceiveIPv6(buff []byte) (int, Endpoint, error)
-	ReceiveIPv4(buff []byte) (int, Endpoint, error)
+	ReceiveIPv6(buff []byte) (int, Endpoint, *net.UDPAddr, error)
+	ReceiveIPv4(buff []byte) (int, Endpoint, *net.UDPAddr, error)
 	Send(buff []byte, end Endpoint) error
 	Close() error
 }
@@ -43,6 +43,7 @@ type Endpoint interface {
 	DstToBytes() []byte  // used for mac2 cookie calculations
 	DstIP() net.IP
 	SrcIP() net.IP
+	UpdateDst(addr *net.UDPAddr) error
 }
 
 func parseEndpoint(s string) (*net.UDPAddr, error) {

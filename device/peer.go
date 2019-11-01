@@ -9,6 +9,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"net"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -319,11 +320,14 @@ func (peer *Peer) Stop() {
 
 var RoamingDisabled bool
 
-func (peer *Peer) SetEndpointFromPacket(endpoint conn.Endpoint) {
+func (peer *Peer) SetEndpointAddress(addr *net.UDPAddr) {
 	if RoamingDisabled {
 		return
 	}
 	peer.Lock()
-	peer.endpoint = endpoint
+	err := peer.endpoint.UpdateDst(addr)
 	peer.Unlock()
+	if err != nil {
+		peer.device.log.Debug.Printf("%v - SetEndpointAddress: %v", peer, err)
+	}
 }

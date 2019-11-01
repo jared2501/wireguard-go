@@ -1,6 +1,6 @@
 // +build !windows
 
-package device
+package conn
 
 import (
 	"syscall"

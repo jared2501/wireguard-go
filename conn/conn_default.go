@@ -51,6 +51,10 @@ func (e *NativeEndpoint) SrcIP() net.IP {
 
 func (e *NativeEndpoint) DstToBytes() []byte {
 	addr := (*net.UDPAddr)(e)
+	return addrToBytes(addr)
+}
+
+func addrToBytes(addr *net.UDPAddr) []byte {
 	out := addr.IP.To4()
 	if out == nil {
 		out = addr.IP
@@ -66,6 +70,11 @@ func (e *NativeEndpoint) DstToString() string {
 
 func (e *NativeEndpoint) SrcToString() string {
 	return ""
+}
+
+func (e *NativeEndpoint) UpdateDst(dst *net.UDPAddr) error {
+	*e = (NativeEndpoint)(*dst)
+	return nil
 }
 
 func listenNet(network string, port int) (*net.UDPConn, int, error) {
@@ -141,23 +150,23 @@ func (bind *nativeBind) Close() error {
 
 func (bind *nativeBind) LastMark() uint32 { return 0 }
 
-func (bind *nativeBind) ReceiveIPv4(buff []byte) (int, Endpoint, error) {
+func (bind *nativeBind) ReceiveIPv4(buff []byte) (int, Endpoint, *net.UDPAddr, error) {
 	if bind.ipv4 == nil {
-		return 0, nil, syscall.EAFNOSUPPORT
+		return 0, nil, nil, syscall.EAFNOSUPPORT
 	}
-	n, endpoint, err := bind.ipv4.ReadFromUDP(buff)
-	if endpoint != nil {
-		endpoint.IP = endpoint.IP.To4()
+	n, addr, err := bind.ipv4.ReadFromUDP(buff)
+	if addr != nil {
+		addr.IP = addr.IP.To4()
 	}
-	return n, (*NativeEndpoint)(endpoint), err
+	return n, (*NativeEndpoint)(addr), addr, err
 }
 
-func (bind *nativeBind) ReceiveIPv6(buff []byte) (int, Endpoint, error) {
+func (bind *nativeBind) ReceiveIPv6(buff []byte) (int, Endpoint, *net.UDPAddr, error) {
 	if bind.ipv6 == nil {
-		return 0, nil, syscall.EAFNOSUPPORT
+		return 0, nil, nil, syscall.EAFNOSUPPORT
 	}
-	n, endpoint, err := bind.ipv6.ReadFromUDP(buff)
-	return n, (*NativeEndpoint)(endpoint), err
+	n, addr, err := bind.ipv6.ReadFromUDP(buff)
+	return n, (*NativeEndpoint)(addr), addr, err
 }
 
 func (bind *nativeBind) Send(buff []byte, endpoint Endpoint) error {
