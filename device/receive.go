@@ -456,7 +456,11 @@ func (device *Device) RoutineHandshake() {
 				peer, elem.addr)
 			atomic.AddUint64(&peer.stats.rxBytes, uint64(len(elem.packet)))
 
-			if peer.handshake.state == HandshakeInitiationConsumed {
+			peer.handshake.mutex.Lock()
+			phs := peer.handshake.state
+			peer.handshake.mutex.Unlock()
+
+			if phs == HandshakeInitiationConsumed {
 				peer.SendHandshakeResponse()
 			} else {
 				logDebug.Printf("%v - SKIPPING response.\n", peer)
