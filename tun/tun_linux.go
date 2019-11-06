@@ -64,14 +64,19 @@ func (tun *NativeTun) routineHackListener() {
 		}
 		switch err {
 		case unix.EINVAL:
+			// If the tunnel is up, it reports that write() is
+			// allowed but we provided invalid data.
 			tun.events <- EventUp
 		case unix.EIO:
+			// If the tunnel is down, it reports that no I/O
+			// is possible, without checking our provided data.
 			tun.events <- EventDown
 		default:
 			return
 		}
 		select {
 		case <-time.After(time.Second):
+			// nothing
 		case <-tun.statusListenersShutdown:
 			return
 		}
@@ -126,6 +131,7 @@ func (tun *NativeTun) routineNetlinkListener() {
 		default:
 		}
 
+		wasEverUp := false
 		for remain := msg[:msgn]; len(remain) >= unix.SizeofNlMsghdr; {
 
 			hdr := *(*unix.NlMsghdr)(unsafe.Pointer(&remain[0]))
@@ -149,10 +155,16 @@ func (tun *NativeTun) routineNetlinkListener() {
 
 				if info.Flags&unix.IFF_RUNNING != 0 {
 					tun.events <- EventUp
+					wasEverUp = true
 				}
 
 				if info.Flags&unix.IFF_RUNNING == 0 {
-					tun.events <- EventDown
+					// Don't emit EventDown before we've ever emitted EventUp.
+					// This avoids a startup race with HackListener, which
+					// might detect Up before we have finished reporting Down.
+					if wasEverUp {
+						tun.events <- EventDown
+					}
 				}
 
 				tun.events <- EventMTUUpdate
