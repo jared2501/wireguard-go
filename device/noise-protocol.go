@@ -15,6 +15,7 @@ import (
 	"golang.org/x/crypto/poly1305"
 	"golang.zx2c4.com/wireguard/device/tokenbucket"
 	"golang.zx2c4.com/wireguard/tai64n"
+	"golang.zx2c4.com/wireguard/wgcfg"
 )
 
 const (
@@ -272,7 +273,8 @@ func (device *Device) ConsumeMessageInitiation(msg *MessageInitiation) *Peer {
 
 	peer := device.LookupPeer(peerPK)
 	if peer == nil {
-		device.log.Debug.Printf("ConsumeMessageInitiation: could not find peer by public key: %s", peerPK.ToHex())
+		k := wgcfg.Key(peerPK)
+		device.log.Debug.Printf("ConsumeMessageInitiation: could not find peer by public key: %s", k.ShortString())
 		return nil
 	}
 
