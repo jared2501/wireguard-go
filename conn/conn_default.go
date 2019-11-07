@@ -5,7 +5,7 @@
  * Copyright (C) 2017-2019 WireGuard LLC. All Rights Reserved.
  */
 
-package device
+package conn
 
 import (
 	"net"
@@ -100,7 +100,7 @@ func extractErrno(err error) error {
 	return syscallErr.Err
 }
 
-func CreateBind(uport uint16, device *Device) (Bind, uint16, error) {
+func CreateBind(uport uint16, device interface{}) (Bind, uint16, error) {
 	var err error
 	var bind nativeBind
 
@@ -134,6 +134,8 @@ func (bind *nativeBind) Close() error {
 	}
 	return err2
 }
+
+func (bind *nativeBind) LastMark() uint32 { return 0 }
 
 func (bind *nativeBind) ReceiveIPv4(buff []byte) (int, Endpoint, error) {
 	if bind.ipv4 == nil {
