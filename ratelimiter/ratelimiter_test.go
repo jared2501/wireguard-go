@@ -89,10 +89,22 @@ func TestRatelimiter(t *testing.T) {
 		net.ParseIP("3f0e:54a2:f5b4:cd19:a21d:58e1:3746:84c4"),
 	}
 
+	now := time.Now()
+	timeNow = func() time.Time {
+		return now
+	}
+	defer func() {
+		timeNow = time.Now
+	}()
+	timeSleep := func(d time.Duration) {
+		now = now.Add(d + 1)
+		ratelimiter.cleanup()
+	}
+
 	ratelimiter.Init()
 
 	for i, res := range expectedResults {
-		time.Sleep(res.wait)
+		timeSleep(res.wait)
 		for _, ip := range ips {
 			allowed := ratelimiter.Allow(ip)
 			if allowed != res.allowed {

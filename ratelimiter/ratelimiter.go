@@ -19,6 +19,8 @@ const (
 	maxTokens          = packetCost * packetsBurstable
 )
 
+var timeNow = time.Now
+
 type RatelimiterEntry struct {
 	sync.Mutex
 	lastTime time.Time
@@ -26,6 +28,8 @@ type RatelimiterEntry struct {
 }
 
 type Ratelimiter struct {
+	ticker *time.Ticker
+
 	sync.RWMutex
 	stopReset chan struct{}
 	tableIPv4 map[[net.IPv4len]byte]*RatelimiterEntry
@@ -56,47 +60,48 @@ func (rate *Ratelimiter) Init() {
 	rate.tableIPv6 = make(map[[net.IPv6len]byte]*RatelimiterEntry)
 
 	// start garbage collection routine
-
+	rate.ticker = time.NewTicker(time.Second)
 	go func() {
-		ticker := time.NewTicker(time.Second)
-		ticker.Stop()
+		rate.ticker.Stop()
 		for {
 			select {
 			case _, ok := <-rate.stopReset:
-				ticker.Stop()
+				rate.ticker.Stop()
 				if ok {
-					ticker = time.NewTicker(time.Second)
+					rate.ticker = time.NewTicker(time.Second)
 				} else {
 					return
 				}
-			case <-ticker.C:
-				func() {
-					rate.Lock()
-					defer rate.Unlock()
-
-					for key, entry := range rate.tableIPv4 {
-						entry.Lock()
-						if time.Since(entry.lastTime) > garbageCollectTime {
-							delete(rate.tableIPv4, key)
-						}
-						entry.Unlock()
-					}
-
-					for key, entry := range rate.tableIPv6 {
-						entry.Lock()
-						if time.Since(entry.lastTime) > garbageCollectTime {
-							delete(rate.tableIPv6, key)
-						}
-						entry.Unlock()
-					}
-
-					if len(rate.tableIPv4) == 0 && len(rate.tableIPv6) == 0 {
-						ticker.Stop()
-					}
-				}()
+			case <-rate.ticker.C:
+				rate.cleanup()
 			}
 		}
 	}()
+}
+
+func (rate *Ratelimiter) cleanup() {
+	rate.Lock()
+	defer rate.Unlock()
+
+	for key, entry := range rate.tableIPv4 {
+		entry.Lock()
+		if timeNow().Sub(entry.lastTime) > garbageCollectTime {
+			delete(rate.tableIPv4, key)
+		}
+		entry.Unlock()
+	}
+
+	for key, entry := range rate.tableIPv6 {
+		entry.Lock()
+		if timeNow().Sub(entry.lastTime) > garbageCollectTime {
+			delete(rate.tableIPv6, key)
+		}
+		entry.Unlock()
+	}
+
+	if len(rate.tableIPv4) == 0 && len(rate.tableIPv6) == 0 {
+		rate.ticker.Stop()
+	}
 }
 
 func (rate *Ratelimiter) Allow(ip net.IP) bool {
@@ -126,7 +131,7 @@ func (rate *Ratelimiter) Allow(ip net.IP) bool {
 	if entry == nil {
 		entry = new(RatelimiterEntry)
 		entry.tokens = maxTokens - packetCost
-		entry.lastTime = time.Now()
+		entry.lastTime = timeNow()
 		rate.Lock()
 		if IPv4 != nil {
 			rate.tableIPv4[keyIPv4] = entry
@@ -146,7 +151,7 @@ func (rate *Ratelimiter) Allow(ip net.IP) bool {
 	// add tokens to entry
 
 	entry.Lock()
-	now := time.Now()
+	now := timeNow()
 	entry.tokens += now.Sub(entry.lastTime).Nanoseconds()
 	entry.lastTime = now
 	if entry.tokens > maxTokens {
