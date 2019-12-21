@@ -189,7 +189,15 @@ func (peer *Peer) timersAnyAuthenticatedPacketReceived() {
 /* Should be called after a handshake initiation message is sent. */
 func (peer *Peer) timersHandshakeInitiated() {
 	if peer.timersActive() {
-		peer.timers.retransmitHandshake.Mod(RekeyTimeout + time.Millisecond*time.Duration(rand.Int31n(RekeyTimeoutJitterMaxMs)))
+		timeout := RekeyTimeout
+		attempts := atomic.LoadUint32(&peer.timers.handshakeAttempts)
+		if attempts == 0 {
+			attempts = 1
+		}
+		if t := time.Duration(attempts) * time.Second; t < timeout {
+			timeout = t
+		}
+		peer.timers.retransmitHandshake.Mod(timeout + time.Millisecond*time.Duration(rand.Int31n(RekeyTimeoutJitterMaxMs)))
 	}
 }
 
