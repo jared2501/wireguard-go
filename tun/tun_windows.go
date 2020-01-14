@@ -44,7 +44,8 @@ type NativeTun struct {
 	writeLock sync.Mutex
 }
 
-const WintunPool = wintun.Pool("WireGuard")
+const WintunGUID = "{37217669-42da-4657-a55b-0d995d328250}"
+const WintunPool = wintun.Pool("Tailscale")
 
 //go:linkname procyield runtime.procyield
 func procyield(cycles uint32)
@@ -57,7 +58,11 @@ func nanotime() int64
 // interface with the same name exist, it is reused.
 //
 func CreateTUN(ifname string, mtu int) (Device, error) {
-	return CreateTUNWithRequestedGUID(ifname, nil, mtu)
+	guid, err := windows.GUIDFromString(WintunGUID)
+	if err != nil {
+		return nil, err
+	}
+	return CreateTUNWithRequestedGUID(ifname, &guid, mtu)
 }
 
 //
