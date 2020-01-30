@@ -313,6 +313,16 @@ func (device *Device) RoutineReadFromTUN() {
 			continue
 		}
 
+		device.filterLock.Lock()
+		fp := device.filterOut
+		device.filterLock.Unlock()
+		if fp != nil {
+			response := fp(elem.packet)
+			if response != FilterAccept {
+				continue
+			}
+		}
+
 		// insert into nonce/pre-handshake queue
 
 		if peer.isRunning.Get() {

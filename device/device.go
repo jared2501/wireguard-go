@@ -43,8 +43,9 @@ type Device struct {
 	createBind     func(uport uint16, device *Device) (conn.Bind, uint16, error)
 	createEndpoint func(key [32]byte, s string) (conn.Endpoint, error)
 
-	filterLock   sync.Mutex
-	filterPacket func(b []byte) FilterResult
+	filterLock sync.Mutex
+	filterIn   func(b []byte) FilterResult
+	filterOut  func(b []byte) FilterResult
 
 	// synchronized resources (locks acquired in order)
 
@@ -302,9 +303,12 @@ type DeviceOptions struct {
 	// HandshakeDone is called every time we complete a peer handshake.
 	HandshakeDone func()
 
-	// FilterPacket is called on each incoming packet, to decide whether
+	// FilterIn is called on each incoming packet, to decide whether
 	// or not to pass it through. If nil, we accept all packets.
-	FilterPacket func(b []byte) FilterResult
+	FilterIn func(b []byte) FilterResult
+
+	// Similarly, FilterOut is called on each outgoing packet.
+	FilterOut func(b []byte) FilterResult
 
 	CreateEndpoint func(key [32]byte, s string) (conn.Endpoint, error)
 	CreateBind     func(uport uint16) (conn.Bind, uint16, error)
@@ -329,7 +333,8 @@ func NewDevice(tunDevice tun.Device, opts *DeviceOptions) *Device {
 			}
 		}
 		device.handshakeDone = opts.HandshakeDone
-		device.filterPacket = opts.FilterPacket
+		device.filterIn = opts.FilterIn
+		device.filterOut = opts.FilterOut
 		if opts.CreateEndpoint != nil {
 			device.createEndpoint = opts.CreateEndpoint
 		} else {
@@ -403,10 +408,11 @@ func NewDevice(tunDevice tun.Device, opts *DeviceOptions) *Device {
 	return device
 }
 
-func (device *Device) SetFilterPacket(filt func(b []byte) FilterResult) {
+func (device *Device) SetFilterInOut(in, out func(b []byte) FilterResult) {
 	device.filterLock.Lock()
 	defer device.filterLock.Unlock()
-	device.filterPacket = filt
+	device.filterIn = in
+	device.filterOut = out
 }
 
 func (device *Device) LookupPeer(pk NoisePublicKey) *Peer {

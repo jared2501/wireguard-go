@@ -289,7 +289,7 @@ func (device *Device) RoutineDecryption() {
 				nil,
 			)
 			device.filterLock.Lock()
-			fp := device.filterPacket
+			fp := device.filterIn
 			device.filterLock.Unlock()
 			if err == nil && fp != nil {
 				response := fp(elem.packet)
