@@ -279,7 +279,7 @@ func (peer *Peer) ExpireCurrentKeypairs() {
 	keypairs := &peer.keypairs
 	keypairs.Lock()
 	if keypairs.current != nil {
-		keypairs.current.sendNonce = RejectAfterMessages
+		atomic.StoreUint64(&keypairs.current.sendNonce, RejectAfterMessages)
 	}
 	if keypairs.next != nil {
 		keypairs.next.sendNonce = RejectAfterMessages
