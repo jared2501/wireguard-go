@@ -148,7 +148,7 @@ func (peer *Peer) SendHandshakeInitiation(isRetry bool) error {
 		return errors.New("no peer endpoint; skipped")
 	}
 
-	peer.device.log.Debug.Printf("%v - %v Send handshake init %v", peer, peer.device, peer.endpoint)
+	//peer.device.log.Debug.Printf("%v - %v Send handshake init %v", peer, peer.device, peer.endpoint)
 
 	msg, err := peer.device.CreateMessageInitiation(peer)
 	if err != nil {
