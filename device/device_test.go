@@ -14,7 +14,7 @@ import (
 	"testing"
 	"time"
 
-	"golang.zx2c4.com/wireguard/tun/tuntest"
+	"github.com/tailscale/wireguard-go/tun/tuntest"
 )
 
 // TODO(crawshaw): pick unused ports on localhost

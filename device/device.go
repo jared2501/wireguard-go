@@ -13,13 +13,13 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/tailscale/wireguard-go/conn"
+	"github.com/tailscale/wireguard-go/ratelimiter"
+	"github.com/tailscale/wireguard-go/rwcancel"
+	"github.com/tailscale/wireguard-go/tun"
+	"github.com/tailscale/wireguard-go/wgcfg"
 	"golang.org/x/net/ipv4"
 	"golang.org/x/net/ipv6"
-	"golang.zx2c4.com/wireguard/conn"
-	"golang.zx2c4.com/wireguard/ratelimiter"
-	"golang.zx2c4.com/wireguard/rwcancel"
-	"golang.zx2c4.com/wireguard/tun"
-	"golang.zx2c4.com/wireguard/wgcfg"
 )
 
 const (

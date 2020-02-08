@@ -13,9 +13,9 @@ import (
 	"golang.org/x/crypto/blake2s"
 	"golang.org/x/crypto/chacha20poly1305"
 	"golang.org/x/crypto/poly1305"
-	"golang.zx2c4.com/wireguard/device/tokenbucket"
-	"golang.zx2c4.com/wireguard/tai64n"
-	"golang.zx2c4.com/wireguard/wgcfg"
+	"github.com/tailscale/wireguard-go/device/tokenbucket"
+	"github.com/tailscale/wireguard-go/tai64n"
+	"github.com/tailscale/wireguard-go/wgcfg"
 )
 
 const (

@@ -13,7 +13,7 @@ import (
 	"path"
 
 	"golang.org/x/sys/unix"
-	"golang.zx2c4.com/wireguard/rwcancel"
+	"github.com/tailscale/wireguard-go/rwcancel"
 )
 
 var socketDirectory = "/var/run/wireguard"

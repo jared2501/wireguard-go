@@ -16,7 +16,7 @@ import (
 	"golang.org/x/sys/windows"
 	"golang.org/x/text/unicode/norm"
 
-	"golang.zx2c4.com/wireguard/tun/wintun/namespaceapi"
+	"github.com/tailscale/wireguard-go/tun/wintun/namespaceapi"
 )
 
 var (

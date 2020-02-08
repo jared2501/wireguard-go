@@ -14,7 +14,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"golang.zx2c4.com/wireguard/conn"
+	"github.com/tailscale/wireguard-go/conn"
 )
 
 const (
