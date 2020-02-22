@@ -569,14 +569,13 @@ func (peer *Peer) RoutineSequentialReceiver() {
 			continue
 		}
 
-		// check for replay
+		// update endpoint
+		peer.SetEndpointAddress(elem.addr)
 
+		// check for replay
 		if !elem.keypair.replayFilter.ValidateCounter(elem.counter, RejectAfterMessages) {
 			continue
 		}
-
-		// update endpoint
-		peer.SetEndpointAddress(elem.addr)
 
 		// check if using new keypair
 		if peer.ReceivedWithKeypair(elem.keypair) {
