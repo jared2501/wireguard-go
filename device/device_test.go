@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/tailscale/wireguard-go/tun/tuntest"
+	"github.com/tailscale/wireguard-go/wgcfg"
 )
 
 // TODO(crawshaw): pick unused ports on localhost
@@ -154,7 +155,7 @@ func assertEqual(t *testing.T, a, b []byte) {
 }
 
 func randDevice(t *testing.T) *Device {
-	sk, err := newPrivateKey()
+	sk, err := wgcfg.NewPrivateKey()
 	if err != nil {
 		t.Fatal(err)
 	}

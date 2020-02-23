@@ -13,6 +13,8 @@ import (
 	"net"
 	"os"
 	"syscall"
+
+	"github.com/tailscale/wireguard-go/wgcfg"
 )
 
 /* This code is meant to be a temporary solution
@@ -75,6 +77,13 @@ func (e *NativeEndpoint) SrcToString() string {
 func (e *NativeEndpoint) UpdateDst(dst *net.UDPAddr) error {
 	*e = (NativeEndpoint)(*dst)
 	return nil
+}
+
+func (e *NativeEndpoint) Addrs() []wgcfg.Endpoint {
+	return []wgcfg.Endpoint{{
+		Host: e.IP.String(),
+		Port: uint16(e.Port),
+	}}
 }
 
 func listenNet(network string, port int) (*net.UDPConn, int, error) {

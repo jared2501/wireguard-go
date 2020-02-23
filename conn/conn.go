@@ -9,6 +9,8 @@ import (
 	"errors"
 	"net"
 	"strings"
+
+	"github.com/tailscale/wireguard-go/wgcfg"
 )
 
 const (
@@ -44,6 +46,7 @@ type Endpoint interface {
 	DstIP() net.IP
 	SrcIP() net.IP
 	UpdateDst(addr *net.UDPAddr) error
+	Addrs() []wgcfg.Endpoint
 }
 
 func parseEndpoint(s string) (*net.UDPAddr, error) {
