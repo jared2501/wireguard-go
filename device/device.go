@@ -8,6 +8,7 @@ package device
 import (
 	"encoding/base64"
 	"fmt"
+	"net"
 	"runtime"
 	"sync"
 	"sync/atomic"
@@ -38,7 +39,7 @@ type Device struct {
 	isUp           AtomicBool // device is (going) up
 	isClosed       AtomicBool // device is closed? (acting as guard)
 	log            *Logger
-	handshakeDone  func()
+	handshakeDone  func(peerKey wgcfg.Key, allowedIPs []net.IPNet)
 	skipBindUpdate bool
 	createBind     func(uport uint16, device *Device) (conn.Bind, uint16, error)
 	createEndpoint func(key [32]byte, s string) (conn.Endpoint, error)
@@ -301,7 +302,8 @@ type DeviceOptions struct {
 	UnexpectedIP func(key *wgcfg.Key, ip wgcfg.IP)
 
 	// HandshakeDone is called every time we complete a peer handshake.
-	HandshakeDone func()
+	// TODO(crawshaw): send the *Peer parameter here?
+	HandshakeDone func(peerKey wgcfg.Key, allowedIPs []net.IPNet)
 
 	// FilterIn is called on each incoming packet, to decide whether
 	// or not to pass it through. If nil, we accept all packets.

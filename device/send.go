@@ -342,6 +342,19 @@ func (peer *Peer) FlushNonceQueue() {
 	}
 }
 
+func (peer *Peer) handshakeDoneCallback() {
+	if peer.device.handshakeDone == nil {
+		return
+	}
+
+	peer.RLock()
+	key := peer.handshake.remoteStatic
+	peer.RUnlock()
+
+	allowedIPs := peer.device.allowedips.EntriesForPeer(peer)
+	peer.device.handshakeDone(key, allowedIPs)
+}
+
 /* Queues packets when there is no handshake.
  * Then assigns nonces to packets sequentially
  * and creates "work" structs for workers
@@ -424,10 +437,7 @@ func (peer *Peer) RoutineNonce() {
 				select {
 				case <-peer.signals.newKeypairArrived:
 					logDebug.Println(peer, "- Obtained awaited keypair")
-					hd := device.handshakeDone
-					if hd != nil {
-						hd()
-					}
+					peer.handshakeDoneCallback()
 
 				case <-peer.signals.flushNonceQueue:
 					device.PutMessageBuffer(elem.buffer)
