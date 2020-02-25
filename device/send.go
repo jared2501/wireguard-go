@@ -253,13 +253,16 @@ func (device *Device) SendPacket(b []byte) (reterr error) {
 	offset := MessageTransportHeaderSize
 	n := copy(elem.buffer[offset:], b)
 	if n < len(b) {
-		return io.ErrShortWrite // TODO(crawshaw): better error messages
+		return io.ErrShortWrite
 	}
 	if n < 8 {
-		return io.ErrShortWrite
+		return errPacketTooBig
 	}
 	elem.packet = elem.buffer[offset : offset+n]
 	peer := device.lookupPeer(elem.packet)
+	if peer == nil {
+		return errNoSuchPeer
+	}
 
 	device.filterLock.Lock()
 	fp := device.filterOut
@@ -279,6 +282,9 @@ func (device *Device) SendPacket(b []byte) (reterr error) {
 	}
 	return nil
 }
+
+var errNoSuchPeer = errors.New("wireguard: no such peer")
+var errPacketTooBig = errors.New("wireguard: packet too big")
 
 /* Reads packets from the TUN and inserts
  * into nonce queue for peer
