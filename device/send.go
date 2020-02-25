@@ -9,6 +9,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
+	"io"
 	"net"
 	"sync"
 	"sync/atomic"
@@ -239,14 +240,52 @@ func (peer *Peer) keepKeyFreshSending() {
 	}
 }
 
+// SendPacket sends a packet out over the device.
+func (device *Device) SendPacket(b []byte) (reterr error) {
+	elem := device.NewOutboundElement()
+	defer func() {
+		if reterr != nil {
+			device.PutMessageBuffer(elem.buffer)
+			device.PutOutboundElement(elem)
+		}
+	}()
+
+	offset := MessageTransportHeaderSize
+	n := copy(elem.buffer[offset:], b)
+	if n < len(b) {
+		return io.ErrShortWrite // TODO(crawshaw): better error messages
+	}
+	if n < 8 {
+		return io.ErrShortWrite
+	}
+	elem.packet = elem.buffer[offset : offset+n]
+	peer := device.lookupPeer(elem.packet)
+
+	device.filterLock.Lock()
+	fp := device.filterOut
+	device.filterLock.Unlock()
+	if fp != nil {
+		response := fp(elem.packet)
+		if response != FilterAccept {
+			return io.ErrNoProgress
+		}
+	}
+
+	if peer.isRunning.Get() {
+		if peer.queue.packetInNonceQueueIsAwaitingKey.Get() {
+			peer.SendHandshakeInitiation(false)
+		}
+		addToNonceQueue(peer.queue.nonce, elem, device)
+	}
+	return nil
+}
+
 /* Reads packets from the TUN and inserts
  * into nonce queue for peer
  *
  * Obs. Single instance per TUN device
  */
 func (device *Device) RoutineReadFromTUN() {
-
-	logDebug := device.log.Debug
 	logError := device.log.Error
 
 	defer func() {
@@ -287,28 +326,7 @@ func (device *Device) RoutineReadFromTUN() {
 
 		elem.packet = elem.buffer[offset : offset+size]
 
-		// lookup peer
-
-		var peer *Peer
-		switch elem.packet[0] >> 4 {
-		case ipv4.Version:
-			if len(elem.packet) < ipv4.HeaderLen {
-				continue
-			}
-			dst := elem.packet[IPv4offsetDst : IPv4offsetDst+net.IPv4len]
-			peer = device.allowedips.LookupIPv4(dst)
-
-		case ipv6.Version:
-			if len(elem.packet) < ipv6.HeaderLen {
-				continue
-			}
-			dst := elem.packet[IPv6offsetDst : IPv6offsetDst+net.IPv6len]
-			peer = device.allowedips.LookupIPv6(dst)
-
-		default:
-			logDebug.Println("Received packet with unknown IP version")
-		}
-
+		peer := device.lookupPeer(elem.packet)
 		if peer == nil {
 			continue
 		}
@@ -332,6 +350,26 @@ func (device *Device) RoutineReadFromTUN() {
 			addToNonceQueue(peer.queue.nonce, elem, device)
 			elem = nil
 		}
+	}
+}
+
+func (device *Device) lookupPeer(packet []byte) *Peer {
+	switch packet[0] >> 4 {
+	case ipv4.Version:
+		if len(packet) < ipv4.HeaderLen {
+			return nil
+		}
+		dst := packet[IPv4offsetDst : IPv4offsetDst+net.IPv4len]
+		return device.allowedips.LookupIPv4(dst)
+	case ipv6.Version:
+		if len(packet) < ipv6.HeaderLen {
+			return nil
+		}
+		dst := packet[IPv6offsetDst : IPv6offsetDst+net.IPv6len]
+		return device.allowedips.LookupIPv6(dst)
+	default:
+		device.log.Debug.Println("Received packet with unknown IP version")
+		return nil
 	}
 }
 
