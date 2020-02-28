@@ -12,16 +12,15 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"net"
 	"os"
 	"sync"
 	"syscall"
 	"time"
 	"unsafe"
 
+	"github.com/tailscale/wireguard-go/rwcancel"
 	"golang.org/x/net/ipv6"
 	"golang.org/x/sys/unix"
-	"github.com/tailscale/wireguard-go/rwcancel"
 )
 
 const (
@@ -174,11 +173,6 @@ func (tun *NativeTun) routineNetlinkListener() {
 			}
 		}
 	}
-}
-
-func (tun *NativeTun) isUp() (bool, error) {
-	inter, err := net.InterfaceByName(tun.name)
-	return inter.Flags&net.FlagUp != 0, err
 }
 
 func getIFIndex(name string) (int32, error) {
