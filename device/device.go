@@ -123,14 +123,10 @@ type Device struct {
  * Must hold device.peers.Mutex
  */
 func unsafeRemovePeer(device *Device, peer *Peer, key wgcfg.Key) {
-
-	// stop routing and processing of packets
-
+	// stop routing of packets
 	device.allowedips.RemoveByPeer(peer)
-	peer.Stop()
 
 	// remove from peer map
-
 	delete(device.peers.keyMap, key)
 }
 
@@ -238,6 +234,13 @@ func (device *Device) IsUnderLoad() bool {
 }
 
 func (device *Device) SetPrivateKey(sk wgcfg.PrivateKey) error {
+	var peersToStop []*Peer
+	defer func() {
+		for _, peer := range peersToStop {
+			peer.Stop()
+		}
+	}()
+
 	// lock required resources
 
 	device.staticIdentity.Lock()
@@ -262,6 +265,7 @@ func (device *Device) SetPrivateKey(sk wgcfg.PrivateKey) error {
 	for key, peer := range device.peers.keyMap {
 		if peer.handshake.remoteStatic.Equal(publicKey) {
 			unsafeRemovePeer(device, peer, key)
+			peersToStop = append(peersToStop, peer)
 		}
 	}
 
@@ -424,25 +428,34 @@ func (device *Device) LookupPeer(pk wgcfg.Key) *Peer {
 	return device.peers.keyMap[pk]
 }
 
+// RemovePeer stops the Peer and removes it from routing.
 func (device *Device) RemovePeer(key wgcfg.Key) {
 	device.peers.Lock()
-	defer device.peers.Unlock()
-	// stop peer and remove from routing
-
-	peer, ok := device.peers.keyMap[key]
-	if ok {
+	peer := device.peers.keyMap[key]
+	if peer != nil {
 		unsafeRemovePeer(device, peer, key)
+	}
+	device.peers.Unlock()
+
+	if peer != nil {
+		peer.Stop()
 	}
 }
 
 func (device *Device) RemoveAllPeers() {
+	var peersToStop []*Peer
+	defer func() {
+		for _, peer := range peersToStop {
+			peer.Stop()
+		}
+	}()
+
 	device.peers.Lock()
 	defer device.peers.Unlock()
-
 	for key, peer := range device.peers.keyMap {
+		peersToStop = append(peersToStop, peer)
 		unsafeRemovePeer(device, peer, key)
 	}
-
 	device.peers.keyMap = make(map[wgcfg.Key]*Peer)
 }
 
