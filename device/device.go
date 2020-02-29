@@ -260,8 +260,11 @@ func (device *Device) SetPrivateKey(sk wgcfg.PrivateKey) error {
 	}
 
 	// remove peers with matching public keys
+	var publicKey wgcfg.Key // allow a zero key here for disabling this device
+	if !sk.IsZero() {
+		publicKey = sk.Public()
+	}
 
-	publicKey := sk.Public()
 	for key, peer := range device.peers.keyMap {
 		if peer.handshake.remoteStatic.Equal(publicKey) {
 			unsafeRemovePeer(device, peer, key)
