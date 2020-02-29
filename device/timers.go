@@ -149,7 +149,11 @@ func expiredZeroKeyMaterial(peer *Peer) {
 }
 
 func expiredPersistentKeepalive(peer *Peer) {
-	if peer.persistentKeepaliveInterval > 0 {
+	peer.RLock()
+	persistentKeepaliveInterval := peer.persistentKeepaliveInterval
+	peer.RUnlock()
+
+	if persistentKeepaliveInterval > 0 {
 		peer.SendKeepalive()
 	}
 }
