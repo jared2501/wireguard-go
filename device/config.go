@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/tailscale/wireguard-go/conn"
 	"github.com/tailscale/wireguard-go/ipc"
 	"github.com/tailscale/wireguard-go/wgcfg"
 )
@@ -57,6 +56,7 @@ func (device *Device) Config() *wgcfg.Config {
 func (device *Device) Reconfig(cfg *wgcfg.Config) (err error) {
 	defer func() {
 		if err != nil {
+			device.log.Debug.Printf("device.Reconfig: failed: %v", err)
 			device.RemoveAllPeers()
 		}
 	}()
@@ -72,6 +72,7 @@ func (device *Device) Reconfig(cfg *wgcfg.Config) (err error) {
 		delete(oldPeers, p.PublicKey)
 	}
 	for k := range oldPeers {
+		device.log.Debug.Printf("device.Reconfig: removing old peer %s", k.ShortString())
 		device.RemovePeer(k)
 	}
 
@@ -80,6 +81,7 @@ func (device *Device) Reconfig(cfg *wgcfg.Config) (err error) {
 	device.staticIdentity.Unlock()
 
 	if !curPrivKey.Equal(cfg.PrivateKey) {
+		device.log.Debug.Println("device.Reconfig: resetting private key")
 		if err := device.SetPrivateKey(cfg.PrivateKey); err != nil {
 			return err
 		}
@@ -99,6 +101,7 @@ func (device *Device) Reconfig(cfg *wgcfg.Config) (err error) {
 	for _, p := range cfg.Peers {
 		peer := device.LookupPeer(p.PublicKey)
 		if peer == nil {
+			device.log.Debug.Printf("device.Reconfig: new peer %s", p.PublicKey.ShortString())
 			peer, err = device.NewPeer(p.PublicKey)
 			if err != nil {
 				return err
@@ -112,23 +115,24 @@ func (device *Device) Reconfig(cfg *wgcfg.Config) (err error) {
 			peer.handshake.mutex.Lock()
 			peer.handshake.presharedKey = p.PresharedKey
 			peer.handshake.mutex.Unlock()
+
+			device.log.Debug.Printf("device.Reconfig: setting preshared key for peer %s", p.PublicKey.ShortString())
 		}
 
-		var ep conn.Endpoint
-		if len(p.Endpoints) > 0 {
+		peer.Lock()
+		peer.persistentKeepaliveInterval = p.PersistentKeepalive
+		if len(p.Endpoints) > 0 && (peer.endpoint == nil || !endpointsEqual(p.Endpoints, peer.endpoint.Addrs())) {
 			str := p.Endpoints[0].String()
 			for _, cfgEp := range p.Endpoints[1:] {
 				str += "," + cfgEp.String()
 			}
-			ep, err = device.createEndpoint(p.PublicKey, str)
+			ep, err := device.createEndpoint(p.PublicKey, str)
 			if err != nil {
+				peer.Unlock()
 				return err
 			}
+			peer.endpoint = ep
 		}
-
-		peer.Lock()
-		peer.endpoint = ep
-		peer.persistentKeepaliveInterval = p.PersistentKeepalive
 		peer.Unlock()
 
 		device.allowedips.RemoveByPeer(peer)
@@ -143,11 +147,28 @@ func (device *Device) Reconfig(cfg *wgcfg.Config) (err error) {
 	}
 
 	// Send immediate keepalive if we're turning it on and before it wasn't on.
-	for _, peer := range newKeepalivePeers {
+	for k, peer := range newKeepalivePeers {
+		device.log.Debug.Printf("device.Reconfig: sending keepalive to peer %s", k.ShortString())
 		peer.SendKeepalive()
 	}
 
 	return nil
+}
+
+func endpointsEqual(x, y []wgcfg.Endpoint) bool {
+	if len(x) != len(y) {
+		return false
+	}
+	eps := make(map[wgcfg.Endpoint]bool)
+	for _, ep := range x {
+		eps[ep] = true
+	}
+	for _, ep := range y {
+		if !eps[ep] {
+			return false
+		}
+	}
+	return true
 }
 
 var ErrPortInUse = fmt.Errorf("wireguard: local port in use: %w", &IPCError{ipc.IpcErrorPortInUse})
