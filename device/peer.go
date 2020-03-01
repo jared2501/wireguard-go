@@ -23,22 +23,28 @@ const (
 )
 
 type Peer struct {
-	isRunning                   AtomicBool
-	sync.RWMutex                // Mostly protects endpoint, but is generally taken whenever we modify peer
-	keypairs                    Keypairs
-	handshake                   Handshake
-	device                      *Device
-	endpoint                    conn.Endpoint
-	persistentKeepaliveInterval uint16
-
-	// All fields must be accessed via atomic load and store.
-	// This must be 64-bit aligned, so make sure the above members come out to even alignment and pad accordingly
+	// These fields are accessed with atomic operations, which must be
+	// 64-bit aligned even on 32-bit platforms. Go guarantees that an
+	// allocated struct will be 64-bit aligned. So we place
+	// atomically-accessed fields up front, so that they can share in
+	// this alignment before smaller fields throw it off.
 	stats struct {
 		txBytes           uint64 // bytes send to peer (endpoint)
 		rxBytes           uint64 // bytes received from peer
 		lastRXNano        int64  // time.Now().UnixNano() of last rxBytes increment
 		lastHandshakeNano int64  // nano seconds since epoch
 	}
+	// This field is only 32 bits wide, but is still aligned to 64
+	// bits. Don't place other atomic fields after this one.
+	isRunning AtomicBool
+
+	// Mostly protects endpoint, but is generally taken whenever we modify peer
+	sync.RWMutex
+	keypairs                    Keypairs
+	handshake                   Handshake
+	device                      *Device
+	endpoint                    conn.Endpoint
+	persistentKeepaliveInterval uint16
 
 	timers struct {
 		retransmitHandshake     *Timer
@@ -281,7 +287,7 @@ func (peer *Peer) ExpireCurrentKeypairs() {
 	keypairs := &peer.keypairs
 	keypairs.Lock()
 	if keypairs.current != nil {
-		atomic.StoreUint64(&keypairs.current.sendNonce, RejectAfterMessages)
+		keypairs.current.sendNonce = RejectAfterMessages
 	}
 	if keypairs.next != nil {
 		keypairs.next.sendNonce = RejectAfterMessages
