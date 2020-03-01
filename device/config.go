@@ -132,6 +132,13 @@ func (device *Device) Reconfig(cfg *wgcfg.Config) (err error) {
 				return err
 			}
 			peer.endpoint = ep
+
+			// TODO(crawshaw): whether or not a new keepalive is necessary
+			// on changing the endpoint depends on the semantics of the
+			// CreateEndpoint func, which is not properly defined. Define it.
+			if p.PersistentKeepalive != 0 && device.isUp.Get() {
+				newKeepalivePeers[p.PublicKey] = peer
+			}
 		}
 		peer.Unlock()
 
