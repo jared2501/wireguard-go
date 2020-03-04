@@ -5,6 +5,7 @@ package device
 import (
 	"fmt"
 	"sort"
+	"time"
 
 	"github.com/tailscale/wireguard-go/ipc"
 	"github.com/tailscale/wireguard-go/wgcfg"
@@ -138,6 +139,11 @@ func (device *Device) Reconfig(cfg *wgcfg.Config) (err error) {
 			// CreateEndpoint func, which is not properly defined. Define it.
 			if p.PersistentKeepalive != 0 && device.isUp.Get() {
 				newKeepalivePeers[p.PublicKey] = peer
+
+				// Make sure the new handshake will get fired.
+				peer.handshake.mutex.Lock()
+				peer.handshake.lastSentHandshake = time.Now().Add(-RekeyTimeout)
+				peer.handshake.mutex.Unlock()
 			}
 		}
 		peer.Unlock()
