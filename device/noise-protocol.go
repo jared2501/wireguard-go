@@ -7,24 +7,44 @@ package device
 
 import (
 	"errors"
+	"fmt"
 	"sync"
 	"time"
 
-	"golang.org/x/crypto/blake2s"
-	"golang.org/x/crypto/chacha20poly1305"
-	"golang.org/x/crypto/poly1305"
 	"github.com/tailscale/wireguard-go/device/tokenbucket"
 	"github.com/tailscale/wireguard-go/tai64n"
 	"github.com/tailscale/wireguard-go/wgcfg"
+	"golang.org/x/crypto/blake2s"
+	"golang.org/x/crypto/chacha20poly1305"
+	"golang.org/x/crypto/poly1305"
 )
 
+type handshakeState int
+
 const (
-	HandshakeZeroed = iota
+	HandshakeZeroed = handshakeState(iota)
 	HandshakeInitiationCreated
 	HandshakeInitiationConsumed
 	HandshakeResponseCreated
 	HandshakeResponseConsumed
 )
+
+func (hs handshakeState) String() string {
+	switch hs {
+	case HandshakeZeroed:
+		return "HandshakeZeroed"
+	case HandshakeInitiationCreated:
+		return "HandshakeInitiationCreated"
+	case HandshakeInitiationConsumed:
+		return "HandshakeInitiationConsumed"
+	case HandshakeResponseCreated:
+		return "HandshakeResponseCreated"
+	case HandshakeResponseConsumed:
+		return "HandshakeResponseConsumed"
+	default:
+		return fmt.Sprintf("Handshake(UNKNOWN:%d)", int(hs))
+	}
+}
 
 const (
 	NoiseConstruction = "Noise_IKpsk2_25519_ChaChaPoly_BLAKE2s"
@@ -97,7 +117,7 @@ type MessageCookieReply struct {
 }
 
 type Handshake struct {
-	state                     int
+	state                     handshakeState
 	mutex                     sync.RWMutex
 	hash                      [blake2s.Size]byte  // hash value
 	chainKey                  [blake2s.Size]byte  // chain key
@@ -540,7 +560,7 @@ func (peer *Peer) BeginSymmetricSession() error {
 		)
 		isInitiator = false
 	} else {
-		return errors.New("invalid state for keypair derivation")
+		return fmt.Errorf("invalid state for keypair derivation: %v", handshake.state)
 	}
 
 	// zero handshake
