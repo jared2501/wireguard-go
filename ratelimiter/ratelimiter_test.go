@@ -7,6 +7,7 @@ package ratelimiter
 
 import (
 	"net"
+	"sync"
 	"testing"
 	"time"
 )
@@ -14,63 +15,50 @@ import (
 type RatelimiterResult struct {
 	allowed bool
 	text    string
-	wait    time.Duration
+	wait    int64 // nanoseconds
 }
 
 func TestRatelimiter(t *testing.T) {
-
-	var ratelimiter Ratelimiter
 	var expectedResults []RatelimiterResult
 
-	Nano := func(nano int64) time.Duration {
-		return time.Nanosecond * time.Duration(nano)
-	}
-
-	Add := func(res RatelimiterResult) {
-		expectedResults = append(
-			expectedResults,
-			res,
-		)
+	add := func(res ...RatelimiterResult) {
+		expectedResults = append(expectedResults, res...)
 	}
 
 	for i := 0; i < packetsBurstable; i++ {
-		Add(RatelimiterResult{
+		add(RatelimiterResult{
 			allowed: true,
 			text:    "initial burst",
 		})
 	}
 
-	Add(RatelimiterResult{
-		allowed: false,
-		text:    "after burst",
-	})
-
-	Add(RatelimiterResult{
-		allowed: true,
-		wait:    Nano(time.Second.Nanoseconds() / packetsPerSecond),
-		text:    "filling tokens for single packet",
-	})
-
-	Add(RatelimiterResult{
-		allowed: false,
-		text:    "not having refilled enough",
-	})
-
-	Add(RatelimiterResult{
-		allowed: true,
-		wait:    2 * (Nano(time.Second.Nanoseconds() / packetsPerSecond)),
-		text:    "filling tokens for two packet burst",
-	})
-
-	Add(RatelimiterResult{
-		allowed: true,
-		text:    "second packet in 2 packet burst",
-	})
-
-	Add(RatelimiterResult{
-		allowed: false,
-		text:    "packet following 2 packet burst",
-	})
+	add(
+		RatelimiterResult{
+			allowed: false,
+			text:    "after burst",
+		},
+		RatelimiterResult{
+			allowed: true,
+			wait:    packetCost,
+			text:    "filling tokens for single packet",
+		},
+		RatelimiterResult{
+			allowed: false,
+			text:    "not having refilled enough",
+		},
+		RatelimiterResult{
+			allowed: true,
+			wait:    2 * packetCost,
+			text:    "filling tokens for two packet burst",
+		},
+		RatelimiterResult{
+			allowed: true,
+			text:    "second packet in 2 packet burst",
+		},
+		RatelimiterResult{
+			allowed: false,
+			text:    "packet following 2 packet burst",
+		})
 
 	ips := []net.IP{
 		net.ParseIP("127.0.0.1"),
@@ -89,22 +77,28 @@ func TestRatelimiter(t *testing.T) {
 		net.ParseIP("3f0e:54a2:f5b4:cd19:a21d:58e1:3746:84c4"),
 	}
 
-	now := time.Now()
+	var (
+		nowMu sync.Mutex
+		now   = time.Now()
+	)
 	timeNow = func() time.Time {
+		nowMu.Lock()
+		defer nowMu.Unlock()
 		return now
 	}
 	defer func() {
 		timeNow = time.Now
 	}()
-	timeSleep := func(d time.Duration) {
-		now = now.Add(d + 1)
-		ratelimiter.cleanup()
+	sleep := func(nanos int64) {
+		nowMu.Lock()
+		now = now.Add(time.Duration(nanos) + 1)
+		nowMu.Unlock()
 	}
 
-	ratelimiter.Init()
-
+	var ratelimiter Ratelimiter
+	defer ratelimiter.Close()
 	for i, res := range expectedResults {
-		timeSleep(res.wait)
+		sleep(res.wait)
 		for _, ip := range ips {
 			allowed := ratelimiter.Allow(ip)
 			if allowed != res.allowed {

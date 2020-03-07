@@ -373,7 +373,6 @@ func NewDevice(tunDevice tun.Device, opts *DeviceOptions) *Device {
 
 	device.peers.keyMap = make(map[wgcfg.Key]*Peer)
 
-	device.rate.limiter.Init()
 	device.rate.underLoadUntil.Store(time.Time{})
 
 	device.indexTable.Init()

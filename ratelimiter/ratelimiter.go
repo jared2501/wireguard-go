@@ -3,6 +3,8 @@
  * Copyright (C) 2017-2019 WireGuard LLC. All Rights Reserved.
  */
 
+// Package ratelimiter implements an IP-based token bucket rate
+// limiter with hardcoded rates.
 package ratelimiter
 
 import (
@@ -15,63 +17,77 @@ const (
 	packetsPerSecond   = 20
 	packetsBurstable   = 5
 	garbageCollectTime = time.Second
-	packetCost         = 1000000000 / packetsPerSecond
+	packetCost         = int64(time.Second) / packetsPerSecond
 	maxTokens          = packetCost * packetsBurstable
 )
 
 var timeNow = time.Now
 
-type RatelimiterEntry struct {
+// bucket is one token bucket. It accumulates 1 token per nanosecond,
+// up to maxTokens. packetCost is the target qps, converted to a
+// number of nanoseconds between allowed packets (not counting burst
+// capacity).
+type bucket struct {
 	sync.Mutex
-	lastTime time.Time
-	tokens   int64
+	lastTime time.Time // last time tokens were taken out.
+	tokens   int64     // remaining tokens as of lastTime.
 }
 
+// Ratelimiter is a per-IP token bucket rate limiter with hardcoded
+// settings.
 type Ratelimiter struct {
 	ticker *time.Ticker
+	once   sync.Once // gates lazy initialization
 
 	sync.RWMutex
+	closed bool
+	// Send a struct{}{} to signal to the GC goroutine to start
+	// collecting old token buckets. Close the channel to shut down
+	// the goroutine.
 	stopReset chan struct{}
-	tableIPv4 map[[net.IPv4len]byte]*RatelimiterEntry
-	tableIPv6 map[[net.IPv6len]byte]*RatelimiterEntry
+	tableIPv4 map[[net.IPv4len]byte]*bucket
+	tableIPv6 map[[net.IPv6len]byte]*bucket
 }
 
+// Close shuts down the rate limiter's maintenance goroutine.
 func (rate *Ratelimiter) Close() {
 	rate.Lock()
 	defer rate.Unlock()
 
+	if rate.closed {
+		return
+	}
+
+	rate.closed = true
 	if rate.stopReset != nil {
 		close(rate.stopReset)
 	}
 }
 
-func (rate *Ratelimiter) Init() {
+// init initializes the rate limiter.
+func (rate *Ratelimiter) init() {
 	rate.Lock()
 	defer rate.Unlock()
 
-	// stop any ongoing garbage collection routine
-
-	if rate.stopReset != nil {
-		close(rate.stopReset)
-	}
-
 	rate.stopReset = make(chan struct{})
-	rate.tableIPv4 = make(map[[net.IPv4len]byte]*RatelimiterEntry)
-	rate.tableIPv6 = make(map[[net.IPv6len]byte]*RatelimiterEntry)
+	rate.tableIPv4 = make(map[[net.IPv4len]byte]*bucket)
+	rate.tableIPv6 = make(map[[net.IPv6len]byte]*bucket)
 
 	// start garbage collection routine
 	rate.ticker = time.NewTicker(time.Second)
 	go func() {
+		// Initially stop the ticker because no token buckets
+		// exist. The first token bucket to be created will restart
+		// the ticker via rate.stopReset.
 		rate.ticker.Stop()
 		for {
 			select {
 			case _, ok := <-rate.stopReset:
 				rate.ticker.Stop()
-				if ok {
-					rate.ticker = time.NewTicker(time.Second)
-				} else {
+				if !ok {
 					return
 				}
+				rate.ticker = time.NewTicker(time.Second)
 			case <-rate.ticker.C:
 				rate.cleanup()
 			}
@@ -79,6 +95,8 @@ func (rate *Ratelimiter) Init() {
 	}()
 }
 
+// cleanup deletes token buckets that have not been accessed for at
+// least garbageCollectTime.
 func (rate *Ratelimiter) cleanup() {
 	rate.Lock()
 	defer rate.Unlock()
@@ -99,15 +117,21 @@ func (rate *Ratelimiter) cleanup() {
 		entry.Unlock()
 	}
 
+	// No more work left to do, quiesce the GC goroutine. It will be
+	// restarted when a token bucket is created.
 	if len(rate.tableIPv4) == 0 && len(rate.tableIPv6) == 0 {
 		rate.ticker.Stop()
 	}
 }
 
 func (rate *Ratelimiter) Allow(ip net.IP) bool {
-	var entry *RatelimiterEntry
-	var keyIPv4 [net.IPv4len]byte
-	var keyIPv6 [net.IPv6len]byte
+	rate.once.Do(rate.init)
+
+	var (
+		entry   *bucket
+		keyIPv4 [net.IPv4len]byte
+		keyIPv6 [net.IPv6len]byte
+	)
 
 	// lookup entry
 
@@ -115,7 +139,6 @@ func (rate *Ratelimiter) Allow(ip net.IP) bool {
 	IPv6 := ip.To16()
 
 	rate.RLock()
-
 	if IPv4 != nil {
 		copy(keyIPv4[:], IPv4)
 		entry = rate.tableIPv4[keyIPv4]
@@ -123,23 +146,25 @@ func (rate *Ratelimiter) Allow(ip net.IP) bool {
 		copy(keyIPv6[:], IPv6)
 		entry = rate.tableIPv6[keyIPv6]
 	}
-
 	rate.RUnlock()
 
-	// make new entry if not found
-
 	if entry == nil {
-		entry = new(RatelimiterEntry)
-		entry.tokens = maxTokens - packetCost
-		entry.lastTime = timeNow()
+		// Need a new bucket, with the current packet's cost already
+		// deducted.
+		entry = &bucket{
+			tokens:   maxTokens - packetCost,
+			lastTime: timeNow(),
+		}
 		rate.Lock()
 		if IPv4 != nil {
 			rate.tableIPv4[keyIPv4] = entry
+			// First bucket, start GCing
 			if len(rate.tableIPv4) == 1 && len(rate.tableIPv6) == 0 {
 				rate.stopReset <- struct{}{}
 			}
 		} else {
 			rate.tableIPv6[keyIPv6] = entry
+			// First bucket, start GCing
 			if len(rate.tableIPv6) == 1 && len(rate.tableIPv4) == 0 {
 				rate.stopReset <- struct{}{}
 			}
@@ -148,9 +173,10 @@ func (rate *Ratelimiter) Allow(ip net.IP) bool {
 		return true
 	}
 
-	// add tokens to entry
-
 	entry.Lock()
+	defer entry.Unlock()
+
+	// Update bucket's token count.
 	now := timeNow()
 	entry.tokens += now.Sub(entry.lastTime).Nanoseconds()
 	entry.lastTime = now
@@ -158,13 +184,10 @@ func (rate *Ratelimiter) Allow(ip net.IP) bool {
 		entry.tokens = maxTokens
 	}
 
-	// subtract cost of packet
-
-	if entry.tokens > packetCost {
-		entry.tokens -= packetCost
-		entry.Unlock()
-		return true
+	// Subtract cost of packet
+	if entry.tokens < packetCost {
+		return false
 	}
-	entry.Unlock()
-	return false
+	entry.tokens -= packetCost
+	return true
 }
