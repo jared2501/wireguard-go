@@ -490,13 +490,22 @@ func (device *Device) Close() {
 
 	device.log.Info.Println("Device closing")
 	device.state.changing.Set(true)
+
+	// Grab the state lock while we shut down both the tun device and
+	// the userspace socket, and force the device state to Down.
+	//
+	// Then we must unlock to allow other goroutines to shut down and
+	// update state if they so desire, otherwise we end up with
+	// infrequent shutdown deadlocks if goroutines are racing each
+	// other.
 	device.state.Lock()
-	defer device.state.Unlock()
 
 	device.tun.device.Close()
 	device.BindClose()
 
 	device.isUp.Set(false)
+
+	device.state.Unlock()
 
 	close(device.signals.stop)
 
@@ -642,6 +651,7 @@ func (device *Device) BindUpdate() error {
 
 		// start receiving routines
 
+		device.log.Debug.Println("ADD %d", conn.ConnRoutineNumber)
 		device.net.starting.Add(conn.ConnRoutineNumber)
 		device.net.stopping.Add(conn.ConnRoutineNumber)
 		go device.RoutineReceiveIncoming(ipv4.Version, netc.bind)
