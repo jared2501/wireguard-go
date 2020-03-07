@@ -651,7 +651,6 @@ func (device *Device) BindUpdate() error {
 
 		// start receiving routines
 
-		device.log.Debug.Println("ADD %d", conn.ConnRoutineNumber)
 		device.net.starting.Add(conn.ConnRoutineNumber)
 		device.net.stopping.Add(conn.ConnRoutineNumber)
 		go device.RoutineReceiveIncoming(ipv4.Version, netc.bind)
