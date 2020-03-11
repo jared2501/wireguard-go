@@ -74,15 +74,22 @@ func (timer *Timer) IsPending() bool {
 }
 
 func (peer *Peer) timersActive() bool {
-	if peer.isRunning.Get() && peer.device != nil && peer.device.isUp.Get() {
-		peer.device.peers.RLock()
-		defer peer.device.peers.RUnlock()
-
-		if len(peer.device.peers.keyMap) > 0 {
-			return true
-		}
+	if !peer.isRunning.Get() {
+		return false
 	}
-	return false
+
+	peer.RLock()
+	device := peer.device
+	peer.RUnlock()
+
+	if device == nil || !device.isUp.Get() {
+		return false
+	}
+
+	device.peers.RLock()
+	defer device.peers.RUnlock()
+
+	return len(device.peers.keyMap) > 0
 }
 
 func expiredRetransmitHandshake(peer *Peer) {
@@ -224,8 +231,16 @@ func (peer *Peer) timersSessionDerived() {
 
 /* Should be called before a packet with authentication -- keepalive, data, or handshake -- is sent, or after one is received. */
 func (peer *Peer) timersAnyAuthenticatedPacketTraversal() {
-	if peer.persistentKeepaliveInterval > 0 && peer.timersActive() {
-		peer.timers.persistentKeepalive.Mod(time.Duration(peer.persistentKeepaliveInterval) * time.Second)
+	if !peer.timersActive() {
+		return
+	}
+
+	peer.RLock()
+	persistentKeepaliveInterval := peer.persistentKeepaliveInterval
+	peer.RUnlock()
+
+	if persistentKeepaliveInterval > 0 {
+		peer.timers.persistentKeepalive.Mod(time.Duration(persistentKeepaliveInterval) * time.Second)
 	}
 }
 
