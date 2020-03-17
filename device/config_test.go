@@ -44,7 +44,7 @@ func TestConfig(t *testing.T) {
 		PrivateKey: pk1,
 		Peers: []wgcfg.Peer{{
 			PublicKey:  pk2.Public(),
-			AllowedIPs: []wgcfg.CIDR{*ip2},
+			AllowedIPs: []wgcfg.CIDR{ip2},
 		}},
 	}
 
@@ -52,7 +52,7 @@ func TestConfig(t *testing.T) {
 		PrivateKey: pk2,
 		Peers: []wgcfg.Peer{{
 			PublicKey:           pk1.Public(),
-			AllowedIPs:          []wgcfg.CIDR{*ip1},
+			AllowedIPs:          []wgcfg.CIDR{ip1},
 			PersistentKeepalive: 5,
 		}},
 	}
@@ -128,7 +128,7 @@ func TestConfig(t *testing.T) {
 	t.Run("device1 add new peer", func(t *testing.T) {
 		cfg1.Peers = append(cfg1.Peers, wgcfg.Peer{
 			PublicKey:  pk3.Public(),
-			AllowedIPs: []wgcfg.CIDR{*ip3},
+			AllowedIPs: []wgcfg.CIDR{ip3},
 		})
 		sort.Slice(cfg1.Peers, func(i, j int) bool {
 			return cfg1.Peers[i].PublicKey.LessThan(&cfg1.Peers[j].PublicKey)
