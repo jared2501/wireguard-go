@@ -63,19 +63,13 @@ func ParsePrivateHexKey(v string) (PrivateKey, error) {
 }
 
 func (k Key) Base64() string    { return base64.StdEncoding.EncodeToString(k[:]) }
-func (k Key) String() string    { return "pub:" + k.Base64()[:8] }
+func (k Key) String() string    { return k.ShortString() }
 func (k Key) HexString() string { return hex.EncodeToString(k[:]) }
 func (k Key) Equal(k2 Key) bool { return subtle.ConstantTimeCompare(k[:], k2[:]) == 1 }
 
 func (k *Key) ShortString() string {
-	if k.IsZero() {
-		return "[empty]"
-	}
-	long := k.String()
-	if len(long) < 10 {
-		return "invalid"
-	}
-	return "[" + long[0:4] + "…" + long[len(long)-5:len(long)-1] + "]"
+	long := k.Base64()
+	return "[" + long[0:5] + "]"
 }
 
 func (k *Key) IsZero() bool {
