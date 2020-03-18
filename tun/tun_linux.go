@@ -392,6 +392,9 @@ func (tun *NativeTun) Close() error {
 func CreateTUN(name string, mtu int) (Device, error) {
 	nfd, err := unix.Open(cloneDevicePath, os.O_RDWR, 0)
 	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, fmt.Errorf("can't create TUN device; %s does not exist", cloneDevicePath)
+		}
 		return nil, err
 	}
 
