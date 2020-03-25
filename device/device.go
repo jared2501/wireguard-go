@@ -160,7 +160,11 @@ func deviceUpdateState(device *Device) {
 		device.peers.RLock()
 		for _, peer := range device.peers.keyMap {
 			peer.Start()
-			if peer.persistentKeepaliveInterval > 0 {
+			peer.RLock()
+			keepalive := peer.persistentKeepaliveInterval
+			peer.RUnlock()
+
+			if keepalive > 0 {
 				peer.SendKeepalive()
 			}
 		}
