@@ -180,7 +180,10 @@ func (peer *Peer) SendHandshakeResponse() error {
 	peer.handshake.lastSentHandshake = time.Now()
 	peer.handshake.mutex.Unlock()
 
+	// We have to hold the peer lock to read peer.endpoint.
+	peer.RLock()
 	peer.device.log.Debug.Printf("%v - Send handshake response %v", peer, peer.endpoint)
+	peer.RUnlock()
 
 	response, err := peer.device.CreateMessageResponse(peer)
 	if err != nil {
